@@ -10,6 +10,10 @@ var userSchema = new mongoose.Schema({
     vip: {
         type: Number,
         default: 0
+    },
+    admin: {
+        type: Number,
+        default: 0
     }
 });
 

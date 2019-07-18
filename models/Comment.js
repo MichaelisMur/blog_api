@@ -1,17 +1,6 @@
 var mongoose = require("mongoose");
 
-var ToySchema = new mongoose.Schema({
-    username: String,
-    comment: String,
-    date: Date,
-    available: {
-        type: Boolean,
-        default: true
-    },
-    restore_expire: Date
-});
-
-var userSchema = new mongoose.Schema({
+var commentSchema = new mongoose.Schema({
     img: String,
     hiddenColor: String,
     hiddenColorOpacity: String,
@@ -19,7 +8,7 @@ var userSchema = new mongoose.Schema({
     hiddenTextSize: String,
     hiddenTextColor: String,
     header: String,
-    comments: [ToySchema],
+    comments: [],
     authCode: Number,
     unauthCode: Number,
     date: {
@@ -28,4 +17,4 @@ var userSchema = new mongoose.Schema({
     }
 });
 
-module.exports = mongoose.model("post", userSchema, "post");
+module.exports = mongoose.model("comment", commentSchema, "comment");
