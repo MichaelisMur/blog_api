@@ -25,6 +25,11 @@ var userSchema = new mongoose.Schema({
     date: {
         type: Date,
         default: Date.now
+    },
+    img: String,
+    show: {
+        type: Boolean,
+        default: true
     }
 });
 

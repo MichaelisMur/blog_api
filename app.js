@@ -1,5 +1,7 @@
 const   cors        = require("cors"),
+        fs          = require("fs"),
         moment      = require("moment"),
+        path        = require('path'),
         request     = require("request"),
         express     = require("express"),
         mongoose    = require("mongoose"),
@@ -12,6 +14,8 @@ const config = require("./root/config.json");
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
+
+app.use("/public", express.static(path.join(__dirname, 'public')));
 
 var corsOptions = {
     origin: '*',
@@ -27,6 +31,9 @@ const Post = require("./models/Post.js");
 mongoose.connect(config.db || "mongodb://localhost/shineon", {useNewUrlParser: true});
 
 
+app.get("/public/img/:id", (req, res)=>{
+    res.send()
+})
 
 app.post("/stat", (req, res)=>{
     User.find({}, (err, data)=>{
@@ -85,7 +92,7 @@ app.post("/login", (req, res)=>{
         if(data){
             if(data.password == req.body.password){
                 let access_expire = new Date();
-                access_expire.setSeconds(access_expire.getSeconds() + 7200);
+                access_expire.setSeconds(access_expire.getSeconds() + 7);
                 let refresh_expire = new Date();
                 refresh_expire.setSeconds(refresh_expire.getSeconds() + 2592000);
                 let access_token = "4ist0_r0fl/\\n4ik" + random.generate(30);
@@ -113,13 +120,6 @@ app.post("/login", (req, res)=>{
                 message: "wrong password or username"
             });
         }
-    })
-})
-app.post("/getUsername", (req, res)=>{
-    User.findById(req.body.id, (err, data)=>{
-        res.send(JSON.stringify({
-            username: data.username
-        }))
     })
 })
 
@@ -151,26 +151,48 @@ app.post("/refreshtoken", (req, res)=>{
 })
 
 app.post("/new", TokenCheck, (req, res)=>{
-    console.log("so..");
     User.findOne({username: req.body.username}, (err, data)=>{
         if(!data.admin) return res.send(JSON.stringify({error: "no admin"}))
-        Post.create({
-            img: req.body.img,
-            hiddenColor: "lightgray",
-            hiddenColorOpacity: "0.3",
-            hiddenText: req.body.hiddenText || "Just testing... Please, stand by...",
+        Post.findByIdAndUpdate(req.body.id, {
+            hiddenColor: req.body.hiddenColor,
+            hiddenColorOpacity: req.body.hiddenColorOpacity,
+            hiddenText: req.body.hiddenText,
             hiddenTextSize: req.body.hiddenTextSize,
-            hiddenTextColor: "white",
+            hiddenTextColor: req.body.hiddenTextColor,
             header: moment().format('MMMM Do YYYY, h:mm a'),
-            comments: [
-    
-            ],
             authCode: req.body.authCode,
-            unauthCode: req.body.unauthCode
+            unauthCode: req.body.unauthCode,
+            show: true
         }, (err, data)=>{
             console.log(data);
             res.send(JSON.stringify({
-                result: 200
+                id: data._id,
+                img: data.img
+            }))
+        })
+    })
+})
+
+app.post("/upload", TokenCheck, (req, res)=>{
+    User.findOne({username: req.body.username}, (err, data)=>{
+        if(!data.admin) return res.send(JSON.stringify({error: "no admin"}))
+        Post.create({
+            hiddenColor: "",
+            hiddenColorOpacity: "",
+            hiddenText: "",
+            hiddenTextSize: "",
+            hiddenTextColor: "",
+            header: moment().format('MMMM Do YYYY, h:mm a'),
+            comments: [],
+            authCode: "",
+            unauthCode: "",
+            img: random.generate({length: 60, capitalization: "lowercase"}),
+            show: false
+        }, (err, data)=>{
+            fs.writeFileSync(`./public/img/${data._id}_${data.img}.jpg`, req.files.file.data);
+            res.send(JSON.stringify({
+                id: data._id,
+                img: data.img
             }))
         })
     })
@@ -290,33 +312,6 @@ app.post("/restorecomment", TokenCheck, (req, res)=>{
     })
 })
 
-app.post("/upload", (req, res)=>{
-    console.log(req.files);
-    res.send(JSON.stringify({
-        hello: "guten Tag!"
-    }))
-})
-
-app.post("/restorecomment", TokenCheck, (req, res)=>{
-    Post.findById(req.body.post_id, (err, post)=>{
-        let comment = post.comments.id(req.body.id);
-        if(!comment.available && comment.restore_expire){
-            if(comment.restore_expire>Date.now()){
-                comment.available = true;
-                post.save(()=>{
-                    res.send({
-                        deleted: false
-                    })
-                })
-            } else {
-                res.send({error: "the time has come"})
-            }
-        } else {
-            res.send({error: "comment was not deleted"})
-        }
-    })
-})
-
 function TokenCheck(req, res, next){
     User.findOne({
         username: req.body.username
@@ -342,13 +337,17 @@ const postObject = (auth, vip, array) => {
     let shit = auth ? 200 : 300;
     let list = [];
     array.forEach(el=>{
-        let authCode = auth ? el.authCode : el.unauthCode;
-        let fuck = vip ? 0 : authCode;
-        let final = codeObject(shit + fuck, el);
-        list.push(final);
+        console.log(el.show)
+        if(el.show){
+            let authCode = auth ? el.authCode : el.unauthCode;
+            let fuck = vip ? 0 : authCode;
+            let final = codeObject(shit + fuck, el);
+            list.push(final);
+        }
     })
     return(list)
 }
+
 const codeObject = (code, obj) => {
     let temp = {}
     if(code == 200){
