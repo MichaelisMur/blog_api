@@ -27,6 +27,7 @@ var userSchema = new mongoose.Schema({
         default: Date.now
     },
     img: String,
+    audio: String,
     show: {
         type: Boolean,
         default: true

@@ -60,4 +60,8 @@ typings/
 # next.js build output
 .nex
 root/
-public/img/
+public/source/
+public/min/
+public/audio/
+public/webm/
+webm/

@@ -9,6 +9,10 @@ const   cors        = require("cors"),
         random      = require("randomstring"),
         fileUpload  = require("express-fileupload");
 
+const imagemin = require('imagemin');
+const imageminMozjpeg = require('imagemin-mozjpeg');
+const imageminPngquant = require('imagemin-pngquant');
+
 const app = express();
 const config = require("./root/config.json");
 
@@ -48,13 +52,11 @@ app.post("/stat", (req, res)=>{
     })
 })
 app.post("/changeRights", (req, res)=>{
-    console.log(req.body.vip);
     User.findOneAndUpdate({username: req.body.username}, {
             vip: req.body.vip==1 ? 0 : 1
         }, 
         (err, data)=>{
             User.findById(data._id, (err, data)=>{
-                console.log(data.vip);
                 res.send({vip: data.vip})
             })
     })
@@ -92,7 +94,7 @@ app.post("/login", (req, res)=>{
         if(data){
             if(data.password == req.body.password){
                 let access_expire = new Date();
-                access_expire.setSeconds(access_expire.getSeconds() + 7);
+                access_expire.setSeconds(access_expire.getSeconds() + 7200);
                 let refresh_expire = new Date();
                 refresh_expire.setSeconds(refresh_expire.getSeconds() + 2592000);
                 let access_token = "4ist0_r0fl/\\n4ik" + random.generate(30);
@@ -189,12 +191,43 @@ app.post("/upload", TokenCheck, (req, res)=>{
             img: random.generate({length: 60, capitalization: "lowercase"}),
             show: false
         }, (err, data)=>{
-            fs.writeFileSync(`./public/img/${data._id}_${data.img}.jpg`, req.files.file.data);
-            res.send(JSON.stringify({
-                id: data._id,
-                img: data.img
-            }))
+
+            fs.writeFile(`public/source/${data._id}_${data.img}.jpg`, req.files.file.data, async (err)=>{
+                    const files = await imagemin([`./public/source/${data._id}_${data.img}.jpg`], {
+                        destination: `./public/min`,
+                        plugins: [
+                            imageminMozjpeg({quality: 50}),
+                            imageminPngquant({
+                                quality: [0.3, 0.5]
+                            })
+                        ]
+                    });
+                    console.log(files)
+                    
+                    res.send(JSON.stringify({
+                        id: data._id,
+                        img: data.img
+                    }))
+            });
+            
         })
+    })
+})
+
+app.post("/uploadAudio", TokenCheck, (req, res)=>{
+    User.findOne({username: req.body.username}, (err, data)=>{
+        if(!data.admin) return res.send(JSON.stringify({error: "no admin"}))
+        // User.findOne({username: req.body.username}, (err, data)=>{
+        Post.findByIdAndUpdate(req.body.id, {
+            audio: req.body.name
+        }, (err, data)=>{
+            fs.writeFile(`public/audio/${req.body.name}.mp3`, req.files.file.data, (err)=>{
+                res.send(JSON.stringify({
+                    uploaded: true,
+                }))
+            });
+        })
+        // })
     })
 })
 
@@ -210,7 +243,7 @@ app.post("/get", (req, res)=>{
                         error: "access token expired"
                     }))
                 } else {
-                    console.log("it's ok");
+
                 }
                 Post.find({}, (err, result)=>{
                     let vip = data.vip;
@@ -312,6 +345,21 @@ app.post("/restorecomment", TokenCheck, (req, res)=>{
     })
 })
 
+app.post("/webm", TokenCheck, (req, res)=>{
+    fs.readdir("./webm", (err, data)=>{
+        let name = data[Math.floor(Math.random()*data.length)]
+        let ext = name.split(".")[name.split(".").length-1]
+        let newName = `${random.generate(10)}.${ext}`
+        fs.copyFile(`./webm/${name}`, `./public/webm/${newName}`, (err) => {
+            if (err) throw err;
+            res.send({
+                link: `http://localhost:3001/public/webm/${newName}`,
+                name: name
+            })
+        })
+    })
+})
+
 function TokenCheck(req, res, next){
     User.findOne({
         username: req.body.username
@@ -337,7 +385,6 @@ const postObject = (auth, vip, array) => {
     let shit = auth ? 200 : 300;
     let list = [];
     array.forEach(el=>{
-        console.log(el.show)
         if(el.show){
             let authCode = auth ? el.authCode : el.unauthCode;
             let fuck = vip ? 0 : authCode;
@@ -367,7 +414,8 @@ const codeObject = (code, obj) => {
             hiddenColorOpacity: obj.hiddenColorOpacity,
             hiddenText: obj.hiddenText,
             hiddenTextColor: obj.hiddenTextColor,
-            hiddenTextSize: obj.hiddenTextSize
+            hiddenTextSize: obj.hiddenTextSize,
+            audio: obj.audio
         };
         return(temp);
     } else if(code == 201){
