@@ -63,28 +63,37 @@ app.post("/changeRights", (req, res)=>{
 })
 
 app.post("/register", (req, res)=>{
-    let access_token = "4ist0_r0fl/\\n4ik" + random.generate(30);
-    let refresh_token = "mamkuebal" + random.generate(30);
-    let access_expire = new Date();
-    access_expire.setSeconds(access_expire.getSeconds() + 7200);
-    let refresh_expire = new Date();
-    refresh_expire.setSeconds(refresh_expire.getSeconds() + 2592000);
-    User.create({
-        username: req.body.username,
-        password: req.body.password,
-        access_token,
-        access_expire: access_expire,
-        refresh_token,
-        refresh_expire: refresh_expire,
-    }, (err, data)=>{
-        console.log(data);
-        res.send(JSON.stringify({
-            username: req.body.username,
-            id: data._id,
-            access_token: access_token,
-            refresh_token: refresh_token
-        }))
+    User.findOne({
+        username: req.body.username
+    }, (err, response)=>{
+        if(response){
+            return res.send(JSON.stringify({error: "Username is already taken"}))
+        } else {
+            let access_token = "4ist0_r0fl/\\n4ik" + random.generate(30);
+            let refresh_token = "mamkuebal" + random.generate(30);
+            let access_expire = new Date();
+            access_expire.setSeconds(access_expire.getSeconds() + 7200);
+            let refresh_expire = new Date();
+            refresh_expire.setSeconds(refresh_expire.getSeconds() + 2592000);
+            User.create({
+                username: req.body.username,
+                password: req.body.password,
+                access_token,
+                access_expire: access_expire,
+                refresh_token,
+                refresh_expire: refresh_expire,
+            }, (err, data)=>{
+                console.log(data);
+                res.send(JSON.stringify({
+                    username: req.body.username,
+                    id: data._id,
+                    access_token: access_token,
+                    refresh_token: refresh_token
+                }))
+            })
+        }
     })
+    
 })
 app.post("/login", (req, res)=>{
     console.log(req.body);
@@ -428,7 +437,8 @@ const codeObject = (code, obj) => {
             hiddenColorOpacity: obj.hiddenColorOpacity,
             hiddenText: obj.hiddenText,
             hiddenTextColor: obj.hiddenTextColor,
-            hiddenTextSize: obj.hiddenTextSize
+            hiddenTextSize: obj.hiddenTextSize,
+            audio: obj.audio
         };
         return(temp);
     } else if(code==202){
@@ -463,7 +473,8 @@ const codeObject = (code, obj) => {
             hiddenColorOpacity: obj.hiddenColorOpacity,
             hiddenText: obj.hiddenText,
             hiddenTextColor: obj.hiddenTextColor,
-            hiddenTextSize: obj.hiddenTextSize
+            hiddenTextSize: obj.hiddenTextSize,
+            audio: obj.audio
         };
         return(temp);
     } else if(code == 301){
@@ -476,7 +487,8 @@ const codeObject = (code, obj) => {
             hiddenColorOpacity: obj.hiddenColorOpacity,
             hiddenText: obj.hiddenText,
             hiddenTextColor: obj.hiddenTextColor,
-            hiddenTextSize: obj.hiddenTextSize
+            hiddenTextSize: obj.hiddenTextSize,
+            audio: obj.audio
         };
         return(temp);
     } else if(code==302){
