@@ -35,10 +35,6 @@ const Post = require("./models/Post.js");
 mongoose.connect(config.db || "mongodb://localhost/shineon", {useNewUrlParser: true});
 
 
-app.get("/public/img/:id", (req, res)=>{
-    res.send()
-})
-
 app.post("/stat", (req, res)=>{
     User.find({}, (err, data)=>{
         let temp = []
@@ -117,18 +113,18 @@ app.post("/login", (req, res)=>{
                         refresh_token,
                         username: data.username,
                         id: data._id,
-                        code: 200
+                        admin: data.admin || ""
                     }))
                 })
             } else {
                 res.send({
-                    message: "wrong password or username"
+                    error: "wrong password or username"
                 });
             }
         }
         else{
             res.send({
-                message: "wrong password or username"
+                error: "wrong password or username"
             });
         }
     })
@@ -161,9 +157,8 @@ app.post("/refreshtoken", (req, res)=>{
     )
 })
 
-app.post("/new", TokenCheck, (req, res)=>{
+app.post("/new", TokenCheck, AdminCheck, (req, res)=>{
     User.findOne({username: req.body.username}, (err, data)=>{
-        if(!data.admin) return res.send(JSON.stringify({error: "no admin"}))
         Post.findByIdAndUpdate(req.body.id, {
             hiddenColor: req.body.hiddenColor,
             hiddenColorOpacity: req.body.hiddenColorOpacity,
@@ -184,9 +179,8 @@ app.post("/new", TokenCheck, (req, res)=>{
     })
 })
 
-app.post("/upload", TokenCheck, (req, res)=>{
+app.post("/upload", TokenCheck, AdminCheck, (req, res)=>{
     User.findOne({username: req.body.username}, (err, data)=>{
-        if(!data.admin) return res.send(JSON.stringify({error: "no admin"}))
         Post.create({
             hiddenColor: "",
             hiddenColorOpacity: "",
@@ -223,10 +217,9 @@ app.post("/upload", TokenCheck, (req, res)=>{
     })
 })
 
-app.post("/uploadAudio", TokenCheck, (req, res)=>{
+app.post("/uploadAudio", TokenCheck, AdminCheck, (req, res)=>{
+    console.log(req.body)
     User.findOne({username: req.body.username}, (err, data)=>{
-        if(!data.admin) return res.send(JSON.stringify({error: "no admin"}))
-        // User.findOne({username: req.body.username}, (err, data)=>{
         Post.findByIdAndUpdate(req.body.id, {
             audio: req.body.name
         }, (err, data)=>{
@@ -236,7 +229,6 @@ app.post("/uploadAudio", TokenCheck, (req, res)=>{
                 }))
             });
         })
-        // })
     })
 })
 
@@ -319,6 +311,41 @@ app.post("/comment", (req, res)=>{
     
 })
 
+app.post("/update", TokenCheck, AdminCheck, (req, res)=>{
+    console.log(req.body)
+    Post.findByIdAndUpdate(req.body.id, {
+        hiddenColor: req.body.hiddenColor,
+        hiddenColorOpacity: req.body.hiddenColorOpacity,
+        hiddenText: req.body.hiddenText,
+        hiddenTextSize: req.body.hiddenTextSize,
+        hiddenTextColor: req.body.hiddenTextColor,
+        authCode: req.body.authCode,
+        unauthCode: req.body.unauthCode,
+    },
+    (err, data)=>{
+        res.send({response: "ok"})
+    })
+})
+
+app.post("/delete", TokenCheck, AdminCheck, (req, res)=>{
+    console.log(req.body)
+    Post.findByIdAndUpdate(req.body.id, {
+        show: false
+    },
+    (err, data)=>{
+        res.send({response: "ok"})
+    })
+})
+app.post("/restore", TokenCheck, AdminCheck, (req, res)=>{
+    console.log(req.body)
+    Post.findByIdAndUpdate(req.body.id, {
+        show: true
+    },
+    (err, data)=>{
+        res.send({response: "ok"})
+    })
+})
+
 app.post("/deletecomment", TokenCheck, (req, res)=>{
     Post.findById(req.body.post_id, (err, post)=>{
         let comment = post.comments.id(req.body.id);
@@ -331,6 +358,13 @@ app.post("/deletecomment", TokenCheck, (req, res)=>{
                 deleted: true
             })
         })
+    })
+})
+
+app.post("/getPost", TokenCheck, AdminCheck, (req, res)=>{
+    Post.findById(req.body.id, (err, post)=>{
+        if(!post) return res.send({error: "not found"})
+        return res.send(post)
     })
 })
 
@@ -373,6 +407,12 @@ function TokenCheck(req, res, next){
     User.findOne({
         username: req.body.username
     }, (err, userData)=>{
+        if(!userData){
+            console.log("unauth")
+            return res.send(JSON.stringify({
+                error: "unauthorized"
+            }))
+        }
         if(req.body.access_token == userData.access_token){
             if(userData.access_expire<new Date()){
                 console.log("OPA")
@@ -385,6 +425,20 @@ function TokenCheck(req, res, next){
         } else {
             return res.send(JSON.stringify({
                 error: "wrong token"
+            }))
+        }
+    })
+}
+function AdminCheck(req, res, next){
+    User.findOne({
+        username: req.body.username
+    }, (err, userData)=>{
+        if(userData.admin == 1){
+            next()
+        } else {
+            console.log("no adm")
+            return res.send(JSON.stringify({
+                error: "no admin"
             }))
         }
     })
