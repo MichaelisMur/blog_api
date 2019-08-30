@@ -32,8 +32,50 @@ app.use(fileUpload());
 mongoose.set("useFindAndModify", false);
 const User = require("./models/User.js");
 const Post = require("./models/Post.js");
+const Spy = require("./models/Spy.js");
 mongoose.connect(config.db || "mongodb://localhost/shineon", {useNewUrlParser: true});
 
+
+//=======The Golden Shield========
+app.use((req, res, next)=>{
+    Spy.findOne({ip: req.ip}, (err, data)=>{
+        if(!data){
+            Spy.create({
+                ip: req.ip,
+                action: {
+                    ammount: 1,
+                    usernames: [req.body.username||""]
+                }
+            }, (err, data)=>{
+                return next()
+            })
+        } else {
+            let expire = new Date()
+            expire.setSeconds(expire.getSeconds() - 1000);
+            if(data.action[data.action.length-1].date<expire){
+                data.action.push({
+                    ammount: 1
+                })
+                data.save(err => {
+                    return next()
+                })
+            } else {
+                data.action[data.action.length-1].ammount += 1;
+                if(data.action[data.action.length-1].usernames.indexOf(req.body.username||"")!=-1){
+                    data.save(err => {
+                        return next()
+                    })
+                } else {
+                    data.action[data.action.length-1].usernames.push(req.body.username||"")
+                    data.save(err => {
+                        return next()
+                    })
+                }
+            }
+        }
+    })
+})
+//=====================
 
 app.post("/stat", (req, res)=>{
     User.find({}, (err, data)=>{
@@ -43,7 +85,7 @@ app.post("/stat", (req, res)=>{
                 username: el.username,
                 vip: el.vip
             })
-            if(data.length == ind + 1) res.send(JSON.stringify(temp))
+            if(data.length == ind + 1) res.send(temp)
         })
     })
 })
@@ -63,7 +105,7 @@ app.post("/register", (req, res)=>{
         username: req.body.username
     }, (err, response)=>{
         if(response){
-            return res.send(JSON.stringify({error: "Username is already taken"}))
+            return res.send({error: "Username is already taken"})
         } else {
             let access_token = "4ist0_r0fl/\\n4ik" + random.generate(30);
             let refresh_token = "mamkuebal" + random.generate(30);
@@ -80,12 +122,12 @@ app.post("/register", (req, res)=>{
                 refresh_expire: refresh_expire,
             }, (err, data)=>{
                 console.log(data);
-                res.send(JSON.stringify({
+                res.send({
                     username: req.body.username,
                     id: data._id,
                     access_token: access_token,
                     refresh_token: refresh_token
-                }))
+                })
             })
         }
     })
@@ -108,13 +150,14 @@ app.post("/login", (req, res)=>{
                     access_token, refresh_token,
                     access_expire, refresh_expire
                 }, (err, data)=>{
-                    res.send(JSON.stringify({
+                    res.send({
                         access_token,
                         refresh_token,
                         username: data.username,
                         id: data._id,
-                        admin: data.admin || ""
-                    }))
+                        admin: data.admin || "",
+                        vip: data.vip || ""
+                    })
                 })
             } else {
                 res.send({
@@ -148,9 +191,9 @@ app.post("/refreshtoken", (req, res)=>{
                     access_token, refresh_token,
                     access_expire, refresh_expire
                 }, (err, data)=>{
-                    return res.send(JSON.stringify({
+                    return res.send({
                         access_token, refresh_token
-                    }))
+                    })
                 })
             }
         }
@@ -171,10 +214,10 @@ app.post("/new", TokenCheck, AdminCheck, (req, res)=>{
             show: true
         }, (err, data)=>{
             console.log(data);
-            res.send(JSON.stringify({
+            res.send({
                 id: data._id,
                 img: data.img
-            }))
+            })
         })
     })
 })
@@ -207,10 +250,10 @@ app.post("/upload", TokenCheck, AdminCheck, (req, res)=>{
                     });
                     console.log(files)
                     
-                    res.send(JSON.stringify({
+                    res.send({
                         id: data._id,
                         img: data.img
-                    }))
+                    })
             });
             
         })
@@ -224,9 +267,9 @@ app.post("/uploadAudio", TokenCheck, AdminCheck, (req, res)=>{
             audio: req.body.name
         }, (err, data)=>{
             fs.writeFile(`public/audio/${req.body.name}.mp3`, req.files.file.data, (err)=>{
-                res.send(JSON.stringify({
+                res.send({
                     uploaded: true,
-                }))
+                })
             });
         })
     })
@@ -240,27 +283,26 @@ app.post("/get", (req, res)=>{
             if(req.body.access_token == data.access_token){
                 if(data.access_expire<new Date()){
                     console.log("OPA");
-                    return res.send(JSON.stringify({
+                    return res.send({
                         error: "access token expired"
-                    }))
-                } else {
-
+                    })
                 }
                 Post.find({}, (err, result)=>{
-                    let vip = data.vip;
+                    let vip = data.vip || data.admin;
                     let NUDES = postObject(1, vip, result);
                     NUDES = NUDES.slice(req.body.index, req.body.index+req.body.toShow);
-                    return res.send(JSON.stringify(NUDES));
+                    return res.send(NUDES)
                 }).sort({date: -1})
             } else {
-                return res.send("wrong token");
+                return res.send({error: "wrong token"});
             }
         })
     } else {
         Post.find({}, (err, result)=>{
             let NUDES = postObject(0, 0, result);
             NUDES = NUDES.slice(req.body.index, req.body.index+req.body.toShow);
-            return res.send(JSON.stringify(NUDES));
+            console.log(NUDES)
+            return res.send(NUDES)
         }).sort({date: -1})
     }
     
@@ -274,9 +316,9 @@ app.post("/comment", (req, res)=>{
             if(req.body.access_token == userData.access_token){
                 if(userData.access_expire<new Date()){
                     console.log("OPA")
-                    return res.send(JSON.stringify({
+                    return res.send({
                         error: "access token expired"
-                    }))
+                    })
                 }
                 //=========
                 Post.findById(req.body.post_id, (err, result)=>{
@@ -297,15 +339,15 @@ app.post("/comment", (req, res)=>{
                 })
                 //=========
             } else {
-                return res.send(JSON.stringify({
+                return res.send({
                     error: "wrong token"
-                }));
+                });
             }
         })
     } else {
         Post.find({}, (err, result)=>{
             let NUDES = postObject(0, 0, result);
-            return res.send(JSON.stringify(NUDES));
+            return res.send(NUDES);
         })
     }
     
@@ -409,23 +451,23 @@ function TokenCheck(req, res, next){
     }, (err, userData)=>{
         if(!userData){
             console.log("unauth")
-            return res.send(JSON.stringify({
+            return res.send({
                 error: "unauthorized"
-            }))
+            })
         }
         if(req.body.access_token == userData.access_token){
             if(userData.access_expire<new Date()){
                 console.log("OPA")
-                return res.send(JSON.stringify({
+                return res.send({
                     error: "access token expired"
-                }))
+                })
             } else {
                 next()
             }
         } else {
-            return res.send(JSON.stringify({
+            return res.send({
                 error: "wrong token"
-            }))
+            })
         }
     })
 }
@@ -437,9 +479,9 @@ function AdminCheck(req, res, next){
             next()
         } else {
             console.log("no adm")
-            return res.send(JSON.stringify({
+            return res.send({
                 error: "no admin"
-            }))
+            })
         }
     })
 }
@@ -451,14 +493,14 @@ const postObject = (auth, vip, array) => {
         if(el.show){
             let authCode = auth ? el.authCode : el.unauthCode;
             let fuck = vip ? 0 : authCode;
-            let final = codeObject(shit + fuck, el);
+            let final = codeObject(shit + fuck, el, vip);
             list.push(final);
         }
     })
     return(list)
 }
 
-const codeObject = (code, obj) => {
+const codeObject = (code, obj, vip) => {
     let temp = {}
     if(code == 200){
         let commentsArray = [];
@@ -478,7 +520,8 @@ const codeObject = (code, obj) => {
             hiddenText: obj.hiddenText,
             hiddenTextColor: obj.hiddenTextColor,
             hiddenTextSize: obj.hiddenTextSize,
-            audio: obj.audio
+            audio: obj.audio,
+            authCode: vip ? obj.authCode : ""
         };
         return(temp);
     } else if(code == 201){
