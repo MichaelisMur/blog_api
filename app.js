@@ -33,6 +33,7 @@ mongoose.set("useFindAndModify", false);
 const User = require("./models/User.js");
 const Post = require("./models/Post.js");
 const Spy = require("./models/Spy.js");
+const News = require("./models/News.js");
 mongoose.connect(config.db || "mongodb://localhost/shineon", {useNewUrlParser: true});
 
 
@@ -301,7 +302,6 @@ app.post("/get", (req, res)=>{
         Post.find({}, (err, result)=>{
             let NUDES = postObject(0, 0, result);
             NUDES = NUDES.slice(req.body.index, req.body.index+req.body.toShow);
-            console.log(NUDES)
             return res.send(NUDES)
         }).sort({date: -1})
     }
@@ -428,6 +428,120 @@ app.post("/restorecomment", TokenCheck, (req, res)=>{
             res.send({error: "comment was not deleted"})
         }
     })
+})
+
+app.post("/addnews", TokenCheck, AdminCheck, (req, res)=>{
+    News.findOne({link: req.body.link}, (err, data)=>{
+        if(!data){
+            News.create({
+                title: req.body.title,
+                link: req.body.link,
+                body: req.body.body,
+                vip: req.body.vip
+            }, (err, data)=>{
+                res.send({status: "nice"})
+            })
+        }
+    })
+})
+
+app.post("/getnews", (req, res)=>{
+    if(req.body.username){
+        User.findOne({
+            username: req.body.username
+        }, (err, data)=>{
+            if(req.body.access_token == data.access_token){
+                if(data.access_expire<new Date()){
+                    console.log("OPA");
+                    return res.send({
+                        error: "access token expired"
+                    })
+                }
+                News.find({}, (err, news)=>{
+                    return res.send(getNews(news, data.vip))
+                }).sort({date: -1})
+            } else {
+                return res.send({error: "wrong token"});
+            }
+        })
+    } else {
+        News.find({}, (err, data)=>{
+            let shit = getNews(data, 0);
+            return res.send(shit)
+        }).sort({date: -1})
+    }
+})
+
+function getNews(data, vip){
+    let temp = []
+    data.forEach((el, i) => {
+        if(el.vip==0 || vip){
+            temp.push(el)
+        }
+    });
+    return temp
+}
+
+app.post("/getarticle", (req, res)=>{
+    if(req.body.username){
+        User.findOne({
+            username: req.body.username
+        }, (err, data)=>{
+            if(req.body.access_token == data.access_token){
+                if(data.access_expire<new Date()){
+                    console.log("OPA");
+                    return res.send({
+                        error: "access token expired"
+                    })
+                }
+                News.findOne({link: req.body.link}, (err, news)=>{
+                    if(news.vip===0 || data.vip){
+                        return res.send(news)
+                    } else {
+                        return res.send({error: "no vip"})
+                    }
+                })
+            } else {
+                return res.send({error: "wrong token"});
+            }
+        })
+    } else {
+        News.findOne({link: req.body.link}, (err, data)=>{
+            if(data.vip===1){
+                return res.send({error: "no vip"})
+            } else {
+                return res.send(data)
+            }
+        })
+    }
+})
+
+app.post("/lastnews", (req, res)=>{
+    if(req.body.username){
+        User.findOne({
+            username: req.body.username
+        }, (err, data)=>{
+            if(req.body.access_token == data.access_token){
+                if(data.access_expire<new Date()){
+                    console.log("OPA");
+                    return res.send({
+                        error: "access token expired"
+                    })
+                }
+                News.find({}, (err, news)=>{
+                    let shit = getNews(news, data.vip);
+                    return res.send(shit.slice(shit.length > 3 ? 2 : 0))
+                }).sort({date: -1})
+            } else {
+                return res.send({error: "wrong token"});
+            }
+        })
+    } else {
+        News.find({}, (err, data)=>{
+            let shit = getNews(data, 0);
+            return res.send(shit.slice(shit.length > 3 ? 2 : 0))
+        }).sort({date: -1})
+    }
 })
 
 app.post("/webm", TokenCheck, (req, res)=>{

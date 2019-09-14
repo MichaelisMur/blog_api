@@ -1,0 +1,14 @@
+var mongoose = require("mongoose");
+
+var newsSchema = new mongoose.Schema({
+    title: String,
+    body: String,
+    link: String,
+    date: {
+        type: Date,
+        default: Date.now
+    },
+    vip: Number
+});
+
+module.exports = mongoose.model("news", newsSchema, "news");
