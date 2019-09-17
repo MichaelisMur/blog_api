@@ -14,7 +14,16 @@ const imageminMozjpeg = require('imagemin-mozjpeg');
 const imageminPngquant = require('imagemin-pngquant');
 
 const app = express();
-const config = require("./root/config.json");
+
+try {
+    const config = require("./root/config.json");
+}
+catch (e) {
+    const config = {
+        db: "mongodb://localhost/michaelis"
+    }
+}
+
 
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
@@ -34,7 +43,7 @@ const User = require("./models/User.js");
 const Post = require("./models/Post.js");
 const Spy = require("./models/Spy.js");
 const News = require("./models/News.js");
-mongoose.connect(config.db || "mongodb://localhost/shineon", {useNewUrlParser: true});
+mongoose.connect(config.db, {useNewUrlParser: true});
 
 
 //=======The Golden Shield========
@@ -78,7 +87,7 @@ app.use((req, res, next)=>{
 })
 //=====================
 
-app.post("/stat", (req, res)=>{
+app.post("/stat", TokenCheck, AdminCheck, (req, res)=>{
     User.find({}, (err, data)=>{
         let temp = []
         data.forEach((el, ind)=>{
@@ -90,8 +99,9 @@ app.post("/stat", (req, res)=>{
         })
     })
 })
-app.post("/changeRights", (req, res)=>{
-    User.findOneAndUpdate({username: req.body.username}, {
+app.post("/changeRights", TokenCheck, AdminCheck, (req, res)=>{
+    console.log("????")
+    User.findOneAndUpdate({username: req.body.usernameEl}, {
             vip: req.body.vip==1 ? 0 : 1
         }, 
         (err, data)=>{
@@ -102,12 +112,21 @@ app.post("/changeRights", (req, res)=>{
 })
 
 app.post("/register", (req, res)=>{
+    console.log(req.body.password.length)
+    if(!req.body.username || !req.body.password)
+    return res.send({
+        error: "invalid data"
+    });
     User.findOne({
         username: req.body.username
     }, (err, response)=>{
         if(response){
             return res.send({error: "Username is already taken"})
         } else {
+            if(req.body.username.length<4 || req.body.password.length<4)
+            return res.send({
+                error: "invalid data"
+            });
             let access_token = "4ist0_r0fl/\\n4ik" + random.generate(30);
             let refresh_token = "mamkuebal" + random.generate(30);
             let access_expire = new Date();
@@ -121,13 +140,18 @@ app.post("/register", (req, res)=>{
                 access_expire: access_expire,
                 refresh_token,
                 refresh_expire: refresh_expire,
+                //===================
+                admin: req.body.username == "michaelis" ? 1 : 0
+                //===================
             }, (err, data)=>{
                 console.log(data);
                 res.send({
                     username: req.body.username,
                     id: data._id,
                     access_token: access_token,
-                    refresh_token: refresh_token
+                    refresh_token: refresh_token,
+                    admin: data.admin || "",
+                    vip: data.vip || ""
                 })
             })
         }
