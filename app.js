@@ -15,11 +15,14 @@ const imageminPngquant = require('imagemin-pngquant');
 
 const app = express();
 
+
+let config = {}
+
 try {
-    const config = require("./root/config.json");
+    config = require("./root/config.json");
 }
 catch (e) {
-    const config = {
+    config = {
         db: "mongodb://localhost/michaelis"
     }
 }
