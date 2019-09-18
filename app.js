@@ -126,7 +126,7 @@ app.post("/register", (req, res)=>{
         if(response){
             return res.send({error: "Username is already taken"})
         } else {
-            if(req.body.username.length<4 || req.body.password.length<4)
+            if(req.body.username.length<3 || req.body.password.length<3)
             return res.send({
                 error: "invalid data"
             });
@@ -144,7 +144,8 @@ app.post("/register", (req, res)=>{
                 refresh_token,
                 refresh_expire: refresh_expire,
                 //===================
-                admin: req.body.username == "michaelis" ? 1 : 0
+                admin: req.body.username == "michaelis" ? 1 : 0,
+                vip: req.body.username == "michaelis" ? 1 : 0
                 //===================
             }, (err, data)=>{
                 console.log(data);
