@@ -213,18 +213,17 @@ app.post("/refreshtoken", (req, res)=>{
         {
             username: req.body.username
         }, (err, data)=>{
-            console.log(req.body.refresh_token);
-            console.log(data.refresh_token);
-            if(req.body.refresh_token == data.refresh_token){
-                User.findByIdAndUpdate(data._id, {
-                    access_token, refresh_token,
-                    access_expire, refresh_expire
-                }, (err, data)=>{
-                    return res.send({
-                        access_token, refresh_token
-                    })
+            if(!data) return res.send({error: "somthing went wrong.."})
+            if(req.body.refresh_token != data.refresh_token) return res.send({error: "somthing went wrong.."})
+
+            User.findByIdAndUpdate(data._id, {
+                access_token, refresh_token,
+                access_expire, refresh_expire
+            }, (err, data)=>{
+                return res.send({
+                    access_token, refresh_token
                 })
-            }
+            })
         }
     )
 })
@@ -305,10 +304,12 @@ app.post("/uploadAudio", TokenCheck, AdminCheck, (req, res)=>{
 })
 
 app.post("/get", (req, res)=>{
+    console.log(req.body.username)
     if(req.body.username){
         User.findOne({
             username: req.body.username
         }, (err, data)=>{
+            if(!data) return res.send({error: "somthing went wrong.."})
             if(req.body.access_token == data.access_token){
                 if(data.access_expire<new Date()){
                     console.log("OPA");
@@ -336,41 +337,29 @@ app.post("/get", (req, res)=>{
     
 })
 
-app.post("/comment", (req, res)=>{
+app.post("/comment", TokenCheck, (req, res)=>{
     if(req.body.username){
         User.findOne({
             username: req.body.username
         }, (err, userData)=>{
-            if(req.body.access_token == userData.access_token){
-                if(userData.access_expire<new Date()){
-                    console.log("OPA")
-                    return res.send({
-                        error: "access token expired"
-                    })
-                }
-                //=========
-                Post.findById(req.body.post_id, (err, result)=>{
-                    result.comments.push({
-                        username: req.body.username,
-                        comment: req.body.comtext,
-                        date: Date.now()
-                    });
-                    result.save((err)=>{
-                        let commentsArray = [];
-                        for(let i = 0; i<result.comments.length; i++){
-                            if(result.comments[i].available){
-                                commentsArray.push(result.comments[i])
-                            }
-                        }
-                        res.send(commentsArray)
-                    })
-                })
-                //=========
-            } else {
-                return res.send({
-                    error: "wrong token"
+            if(!userData) return res.send({error: "somthing went wrong.."})
+            //=========
+            Post.findById(req.body.post_id, (err, result)=>{
+                result.comments.push({
+                    username: req.body.username,
+                    comment: req.body.comtext,
+                    date: Date.now()
                 });
-            }
+                result.save((err)=>{
+                    let commentsArray = [];
+                    for(let i = 0; i<result.comments.length; i++){
+                        if(result.comments[i].available){
+                            commentsArray.push(result.comments[i])
+                        }
+                    }
+                    res.send(commentsArray)
+                })
+            })
         })
     } else {
         Post.find({}, (err, result)=>{
@@ -418,6 +407,8 @@ app.post("/restore", TokenCheck, AdminCheck, (req, res)=>{
 
 app.post("/deletecomment", TokenCheck, (req, res)=>{
     Post.findById(req.body.post_id, (err, post)=>{
+        if(!post) return res.send({error: "somthing went wrong.."})
+        console.log(post)
         let comment = post.comments.id(req.body.id);
         let restore_expire = new Date();
         restore_expire.setSeconds(restore_expire.getSeconds() + 300);
@@ -440,6 +431,7 @@ app.post("/getPost", TokenCheck, AdminCheck, (req, res)=>{
 
 app.post("/restorecomment", TokenCheck, (req, res)=>{
     Post.findById(req.body.post_id, (err, post)=>{
+        // if(!post) return res.send({error: })
         let comment = post.comments.id(req.body.id);
         if(!comment.available && comment.restore_expire){
             if(comment.restore_expire>Date.now()){
@@ -467,7 +459,7 @@ app.post("/addnews", TokenCheck, AdminCheck, (req, res)=>{
                 body: req.body.body,
                 vip: req.body.vip
             }, (err, data)=>{
-                res.send({status: "nice"})
+                res.send({link: data.link})
             })
         }
     })
@@ -478,6 +470,7 @@ app.post("/getnews", (req, res)=>{
         User.findOne({
             username: req.body.username
         }, (err, data)=>{
+            if(!data) return res.send({error: "something went wrong"})
             if(req.body.access_token == data.access_token){
                 if(data.access_expire<new Date()){
                     console.log("OPA");
@@ -504,7 +497,12 @@ function getNews(data, vip){
     let temp = []
     data.forEach((el, i) => {
         if(el.vip==0 || vip){
+            console.log(el)
             temp.push(el)
+        } else {
+            temp.push({
+                hidden: true
+            })
         }
     });
     return temp
@@ -597,6 +595,7 @@ function TokenCheck(req, res, next){
                 error: "unauthorized"
             })
         }
+        console.log(userData);
         if(req.body.access_token == userData.access_token){
             if(userData.access_expire<new Date()){
                 console.log("OPA")
