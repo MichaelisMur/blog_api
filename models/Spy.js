@@ -11,8 +11,13 @@ var userSchema = new mongoose.Schema({
         date: {
             type: Date,
             default: Date.now
-        }
-    }]
+        },
+        importantActions: [{
+            url: String,
+            requestBody: Object,
+            date: Date
+        }]
+    }],
 });
 
 module.exports = mongoose.model("spy", userSchema, "spy");

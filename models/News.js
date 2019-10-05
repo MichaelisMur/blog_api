@@ -8,6 +8,10 @@ var newsSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
+    deleted: {
+        type: Boolean,
+        default: false
+    },
     vip: Number
 });
 

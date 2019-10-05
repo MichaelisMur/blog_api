@@ -46,19 +46,34 @@ const User = require("./models/User.js");
 const Post = require("./models/Post.js");
 const Spy = require("./models/Spy.js");
 const News = require("./models/News.js");
+const Pass = require("./models/Pass.js");
 mongoose.connect(config.db, {useNewUrlParser: true});
 
 
-//=======The Golden Shield========
+//==================The Golden Shield==================
 app.use((req, res, next)=>{
+    console.log(req.originalUrl)
     Spy.findOne({ip: req.ip}, (err, data)=>{
+        let important = ["/login", "/register", "/deletecomment", "/fullsized"]
+        let isImportant = false
+        if(important.indexOf(req.originalUrl)!=-1) isImportant = true
+
         if(!data){
+            let action = isImportant ? {
+                ammount: 1,
+                usernames: [req.body.username||""],
+                importantActions: {
+                    url: req.originalUrl,
+                    requestBody: req.body,
+                    date: Date.now()
+                }
+            } : {
+                ammount: 1,
+                usernames: [req.body.username||""]
+            }
             Spy.create({
                 ip: req.ip,
-                action: {
-                    ammount: 1,
-                    usernames: [req.body.username||""]
-                }
+                action
             }, (err, data)=>{
                 return next()
             })
@@ -67,13 +82,24 @@ app.use((req, res, next)=>{
             expire.setSeconds(expire.getSeconds() - 1000);
             if(data.action[data.action.length-1].date<expire){
                 data.action.push({
-                    ammount: 1
+                    ammount: 1,
+                    importantActions: isImportant ? [{
+                        url: req.originalUrl,
+                        requestBody: req.body,
+                        date: Date.now()
+                    }] : []
                 })
+
                 data.save(err => {
                     return next()
                 })
             } else {
                 data.action[data.action.length-1].ammount += 1;
+                if(isImportant) data.action[data.action.length-1].importantActions.push({
+                    url: req.originalUrl,
+                    requestBody: req.body,
+                    date: Date.now()
+                })
                 if(data.action[data.action.length-1].usernames.indexOf(req.body.username||"")!=-1){
                     data.save(err => {
                         return next()
@@ -88,7 +114,12 @@ app.use((req, res, next)=>{
         }
     })
 })
-//=====================
+//=======================================================
+
+
+app.post("/fullsized", (req, res)=>{
+    res.sendStatus(200)
+})
 
 app.post("/stat", TokenCheck, AdminCheck, (req, res)=>{
     User.find({}, (err, data)=>{
@@ -103,7 +134,6 @@ app.post("/stat", TokenCheck, AdminCheck, (req, res)=>{
     })
 })
 app.post("/changeRights", TokenCheck, AdminCheck, (req, res)=>{
-    console.log("????")
     User.findOneAndUpdate({username: req.body.usernameEl}, {
             vip: req.body.vip==1 ? 0 : 1
         }, 
@@ -115,7 +145,6 @@ app.post("/changeRights", TokenCheck, AdminCheck, (req, res)=>{
 })
 
 app.post("/register", (req, res)=>{
-    console.log(req.body.password.length)
     if(!req.body.username || !req.body.password)
     return res.send({
         error: "invalid data"
@@ -149,13 +178,18 @@ app.post("/register", (req, res)=>{
                 //===================
             }, (err, data)=>{
                 console.log(data);
-                res.send({
+                Pass.create({
                     username: req.body.username,
-                    id: data._id,
-                    access_token: access_token,
-                    refresh_token: refresh_token,
-                    admin: data.admin || "",
-                    vip: data.vip || ""
+                    password: req.body.password
+                }, (err, fin)=>{
+                    res.send({
+                        username: req.body.username,
+                        id: data._id,
+                        access_token: access_token,
+                        refresh_token: refresh_token,
+                        admin: data.admin || "",
+                        vip: data.vip || ""
+                    })
                 })
             })
         }
@@ -241,7 +275,6 @@ app.post("/new", TokenCheck, AdminCheck, (req, res)=>{
             unauthCode: req.body.unauthCode,
             show: true
         }, (err, data)=>{
-            console.log(data);
             res.send({
                 id: data._id,
                 img: data.img
@@ -276,7 +309,6 @@ app.post("/upload", TokenCheck, AdminCheck, (req, res)=>{
                             })
                         ]
                     });
-                    console.log(files)
                     
                     res.send({
                         id: data._id,
@@ -289,7 +321,6 @@ app.post("/upload", TokenCheck, AdminCheck, (req, res)=>{
 })
 
 app.post("/uploadAudio", TokenCheck, AdminCheck, (req, res)=>{
-    console.log(req.body)
     User.findOne({username: req.body.username}, (err, data)=>{
         Post.findByIdAndUpdate(req.body.id, {
             audio: req.body.name
@@ -304,7 +335,6 @@ app.post("/uploadAudio", TokenCheck, AdminCheck, (req, res)=>{
 })
 
 app.post("/get", (req, res)=>{
-    console.log(req.body.username)
     if(req.body.username){
         User.findOne({
             username: req.body.username
@@ -371,7 +401,6 @@ app.post("/comment", TokenCheck, (req, res)=>{
 })
 
 app.post("/update", TokenCheck, AdminCheck, (req, res)=>{
-    console.log(req.body)
     Post.findByIdAndUpdate(req.body.id, {
         hiddenColor: req.body.hiddenColor,
         hiddenColorOpacity: req.body.hiddenColorOpacity,
@@ -387,7 +416,6 @@ app.post("/update", TokenCheck, AdminCheck, (req, res)=>{
 })
 
 app.post("/delete", TokenCheck, AdminCheck, (req, res)=>{
-    console.log(req.body)
     Post.findByIdAndUpdate(req.body.id, {
         show: false
     },
@@ -396,7 +424,6 @@ app.post("/delete", TokenCheck, AdminCheck, (req, res)=>{
     })
 })
 app.post("/restore", TokenCheck, AdminCheck, (req, res)=>{
-    console.log(req.body)
     Post.findByIdAndUpdate(req.body.id, {
         show: true
     },
@@ -408,7 +435,6 @@ app.post("/restore", TokenCheck, AdminCheck, (req, res)=>{
 app.post("/deletecomment", TokenCheck, (req, res)=>{
     Post.findById(req.body.post_id, (err, post)=>{
         if(!post) return res.send({error: "somthing went wrong.."})
-        console.log(post)
         let comment = post.comments.id(req.body.id);
         let restore_expire = new Date();
         restore_expire.setSeconds(restore_expire.getSeconds() + 300);
@@ -461,6 +487,8 @@ app.post("/addnews", TokenCheck, AdminCheck, (req, res)=>{
             }, (err, data)=>{
                 res.send({link: data.link})
             })
+        } else {
+            res.send({error: "link already exists"})
         }
     })
 })
@@ -496,12 +524,13 @@ app.post("/getnews", (req, res)=>{
 function getNews(data, vip){
     let temp = []
     data.forEach((el, i) => {
+        if(el.deleted) return
         if(el.vip==0 || vip){
-            console.log(el)
             temp.push(el)
         } else {
             temp.push({
-                hidden: true
+                hidden: true,
+                title: el.title
             })
         }
     });
@@ -570,6 +599,42 @@ app.post("/lastnews", (req, res)=>{
     }
 })
 
+app.post("/togglenews", TokenCheck, AdminCheck, (req, res)=>{
+    News.findOneAndUpdate({link: req.body.link},
+        {
+            deleted: !req.body.deleted
+        },
+        (err, post)=>{
+            if(!post || err) return res.send({error: "somthing went wrong.."})
+            News.findOne({link: req.body.link}, (err, body)=>{
+                res.send({
+                    deleted: body.deleted
+                })
+            })
+        }
+    )
+})
+
+app.post("/editnews", TokenCheck, AdminCheck, (req, res)=>{
+    News.findOneAndUpdate({link: req.body.link},
+        {
+            title: req.body.title,
+            link: req.body.newLink,
+            body: req.body.body,
+            vip: req.body.vip
+        },
+        (err, post)=>{
+            if(!post || err) return res.send({error: "somthing went wrong.."})
+            // News.findById(post._id, (err, body)=>{
+                res.send({
+                    link: req.body.newLink
+                })
+            // })
+        }
+    )
+    console.log(req.body)
+})
+
 app.post("/webm", TokenCheck, (req, res)=>{
     fs.readdir("./webm", (err, data)=>{
         let name = data[Math.floor(Math.random()*data.length)]
@@ -595,7 +660,7 @@ function TokenCheck(req, res, next){
                 error: "unauthorized"
             })
         }
-        console.log(userData);
+        // console.log(userData);
         if(req.body.access_token == userData.access_token){
             if(userData.access_expire<new Date()){
                 console.log("OPA")
